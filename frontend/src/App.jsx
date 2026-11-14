@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
 import './App.css'
 
-const API = 'http://localhost:5000'
+const API = 'https://tcp-failure-analyse-1.onrender.com'
 
 function App() {
   const [ip, setIp] = useState('google.com')
