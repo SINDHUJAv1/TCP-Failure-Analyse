@@ -1088,3 +1088,17 @@ tbody tr:hover {
     font-size: 8px;
   }
 }
+/* Show FAILED final state in red */
+.transition-diagram-wrapper:has(.diagram-failure) .final-label {
+  color: #b91c1c;
+}
+
+.transition-diagram-wrapper:has(.diagram-failure) .final-node {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #ef4444;
+}
+
+.transition-diagram-wrapper:has(.diagram-failure) .state-check {
+  background: #dc2626;
+}
