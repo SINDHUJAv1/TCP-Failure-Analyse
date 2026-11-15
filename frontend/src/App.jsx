@@ -18,6 +18,9 @@ function App() {
   const [mongoStatus, setMongoStatus] = useState('Checking')
   const [loading, setLoading] = useState(false)
   const [activePage, setActivePage] = useState('Dashboard')
+  const [refreshing, setRefreshing] = useState(false)
+const [refreshMessage, setRefreshMessage] = useState('')
+const [lastUpdated, setLastUpdated] = useState(null)
 
   const successRate = attempts > 0
     ? ((successCount / attempts) * 100).toFixed(1)
