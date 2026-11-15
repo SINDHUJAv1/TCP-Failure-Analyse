@@ -18,9 +18,11 @@ function App() {
   const [mongoStatus, setMongoStatus] = useState('Checking')
   const [loading, setLoading] = useState(false)
   const [activePage, setActivePage] = useState('Dashboard')
+
+  // Refresh states
   const [refreshing, setRefreshing] = useState(false)
-const [refreshMessage, setRefreshMessage] = useState('')
-const [lastUpdated, setLastUpdated] = useState(null)
+  const [refreshMessage, setRefreshMessage] = useState('')
+  const [lastUpdated, setLastUpdated] = useState(null)
 
   const successRate = attempts > 0
     ? ((successCount / attempts) * 100).toFixed(1)
@@ -33,27 +35,65 @@ const [lastUpdated, setLastUpdated] = useState(null)
     ])
   }
 
-  const fetchHistory = async () => {
+  // Fetch latest data from MongoDB
+  const fetchHistory = async (showFeedback = false) => {
+    if (showFeedback) {
+      setRefreshing(true)
+      setRefreshMessage('')
+    }
+
     try {
       const response = await fetch(`${API}/api/history`)
-      if (!response.ok) throw new Error('History unavailable')
+
+      if (!response.ok) {
+        throw new Error('Unable to fetch latest history')
+      }
 
       const data = await response.json()
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid history response')
+      }
 
       setConnectionHistory(data)
       setMongoStatus('Connected')
 
-      // Calculate statistics from saved MongoDB records
       setAttempts(data.length)
-      setSuccessCount(data.filter(x => x.status === 'Success').length)
-      setFailureCount(data.filter(x => x.status !== 'Success').length)
+      setSuccessCount(
+        data.filter(x => x.status === 'Success').length
+      )
+      setFailureCount(
+        data.filter(x => x.status !== 'Success').length
+      )
 
-      if (data.length > 0) {
-        setFlatAnalysis(data[0].flatAnalysis || null)
+      setFlatAnalysis(
+        data.length > 0
+          ? data[0].flatAnalysis || null
+          : null
+      )
+
+      setLastUpdated(new Date())
+
+      if (showFeedback) {
+        setRefreshMessage('Data refreshed successfully!')
+        addLog('Dashboard data refreshed from MongoDB')
       }
+
     } catch (error) {
       setMongoStatus('Disconnected')
       console.error(error.message)
+
+      if (showFeedback) {
+        setRefreshMessage(
+          'Refresh failed. Check backend connection.'
+        )
+        addLog(`Refresh failed: ${error.message}`)
+      }
+
+    } finally {
+      if (showFeedback) {
+        setRefreshing(false)
+      }
     }
   }
 
@@ -61,6 +101,7 @@ const [lastUpdated, setLastUpdated] = useState(null)
     fetchHistory()
   }, [])
 
+  // TCP connection testing
   const startConnection = async () => {
     if (!ip.trim() || !port) {
       setStatus('Please enter hostname and port')
@@ -69,7 +110,11 @@ const [lastUpdated, setLastUpdated] = useState(null)
 
     const portNumber = Number(port)
 
-    if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+    if (
+      !Number.isInteger(portNumber) ||
+      portNumber < 1 ||
+      portNumber > 65535
+    ) {
       setStatus('Invalid Port')
       addLog('Invalid port number entered')
       return
@@ -82,25 +127,41 @@ const [lastUpdated, setLastUpdated] = useState(null)
     try {
       const response = await fetch(`${API}/api/test-connection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host: ip.trim(), port: portNumber })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          host: ip.trim(),
+          port: portNumber
+        })
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Connection request failed')
+        throw new Error(
+          data.message || 'Connection request failed'
+        )
       }
 
-      setStatus(data.status === 'Success' ? 'Established' : 'Failed')
+      setStatus(
+        data.status === 'Success'
+          ? 'Established'
+          : 'Failed'
+      )
+
       setFlatAnalysis(data.flatAnalysis || null)
 
-      addLog(`${data.status}: ${data.message || 'TCP test completed'}`)
+      addLog(
+        `${data.status}: ${data.message || 'TCP test completed'}`
+      )
 
       await fetchHistory()
+
     } catch (error) {
       setStatus('Failed')
       addLog(`Error: ${error.message}`)
+
     } finally {
       setLoading(false)
     }
@@ -120,6 +181,7 @@ const [lastUpdated, setLastUpdated] = useState(null)
     setLogs([])
   }
 
+  // PDF Report
   const generateReport = () => {
     const doc = new jsPDF()
 
@@ -149,6 +211,7 @@ const [lastUpdated, setLastUpdated] = useState(null)
           doc.addPage()
           y = 20
         }
+
         doc.text(line, 20, y)
         y += 7
       })
@@ -158,21 +221,30 @@ const [lastUpdated, setLastUpdated] = useState(null)
     addLog('PDF report downloaded')
   }
 
+  // Navigation
   const scrollTo = (page) => {
     setActivePage(page)
+
     const element = document.getElementById(
       page === 'Dashboard' ? 'dashboard' :
       page === 'Simulator' ? 'simulator' :
       page === 'History' ? 'history' : 'reports'
     )
-    element?.scrollIntoView({ behavior: 'smooth' })
+
+    element?.scrollIntoView({
+      behavior: 'smooth'
+    })
   }
 
   return (
     <div className="app">
+
+      {/* Sidebar */}
       <aside className="sidebar">
+
         <div className="brand">
           <div className="brand-icon">TCP</div>
+
           <div>
             <h2>TCP Monitor</h2>
             <span>Connection Analysis</span>
@@ -192,44 +264,91 @@ const [lastUpdated, setLastUpdated] = useState(null)
             className={`nav-item ${activePage === name ? 'active' : ''}`}
             onClick={() => scrollTo(name)}
           >
-            <span>{icon}</span>{name}
+            <span>{icon}</span>
+            {name}
           </button>
         ))}
 
         <div className="sidebar-bottom">
+
           <div className="mongo-side">
-            <span className={`dot ${mongoStatus === 'Connected' ? 'green' : 'red'}`} />
+            <span
+              className={`dot ${
+                mongoStatus === 'Connected' ? 'green' : 'red'
+              }`}
+            />
+
             <div>
               <strong>MongoDB</strong>
               <small>{mongoStatus}</small>
             </div>
           </div>
+
           <p>TCP Failure Analysis v1.0</p>
         </div>
+
       </aside>
 
+      {/* Main Dashboard */}
       <main className="main-content" id="dashboard">
+
         <header className="topbar">
+
           <div>
             <h1>TCP Connection Failure Analysis</h1>
             <p>Monitor, test and analyze TCP connections</p>
           </div>
+
           <div className="online-status">
-            <span className="dot green" /> System Online
+            <span className="dot green" />
+            System Online
           </div>
+
         </header>
 
+        {/* Dashboard Overview */}
         <section className="welcome-row">
+
           <div>
             <h2>Dashboard Overview</h2>
             <p>Real-time TCP connection monitoring dashboard</p>
           </div>
-          <button className="refresh-btn" onClick={fetchHistory}>
-            ↻ Refresh Data
-          </button>
+
+          <div>
+            <button
+              className="refresh-btn"
+              onClick={() => fetchHistory(true)}
+              disabled={refreshing}
+            >
+              {refreshing ? 'Refreshing...' : '↻ Refresh Data'}
+            </button>
+
+            <small
+              style={{
+                display: 'block',
+                marginTop: '8px'
+              }}
+            >
+              {refreshMessage}
+            </small>
+
+            {lastUpdated && (
+              <small
+                style={{
+                  display: 'block',
+                  marginTop: '4px'
+                }}
+              >
+                Last Updated: {lastUpdated.toLocaleTimeString()}
+              </small>
+            )}
+          </div>
+
         </section>
 
+        {/* Statistics */}
         <section className="stats-grid">
+
           <div className="stat-card blue">
             <div className="stat-icon">⌁</div>
             <p>Total Attempts</p>
@@ -257,19 +376,28 @@ const [lastUpdated, setLastUpdated] = useState(null)
             <h2>{successRate}%</h2>
             <small>Based on saved history</small>
           </div>
+
         </section>
 
+        {/* Simulator and FLAT Analysis */}
         <section className="content-grid" id="simulator">
+
+          {/* Connection Simulator */}
           <div className="panel simulator-panel">
+
             <div className="panel-heading">
+
               <div>
                 <h2>Connection Simulator</h2>
                 <p>Test a TCP connection using hostname and port</p>
               </div>
+
               <span className="small-tag">TCP TEST</span>
+
             </div>
 
             <label>Hostname / IP Address</label>
+
             <input
               value={ip}
               onChange={e => setIp(e.target.value)}
@@ -277,6 +405,7 @@ const [lastUpdated, setLastUpdated] = useState(null)
             />
 
             <label>Port Number</label>
+
             <input
               type="number"
               value={port}
@@ -285,6 +414,7 @@ const [lastUpdated, setLastUpdated] = useState(null)
             />
 
             <div className="action-buttons">
+
               <button
                 className="primary-btn"
                 onClick={startConnection}
@@ -292,58 +422,166 @@ const [lastUpdated, setLastUpdated] = useState(null)
               >
                 {loading ? 'Testing...' : '▶ Test Connection'}
               </button>
-              <button className="secondary-btn" onClick={disconnect}>
+
+              <button
+                className="secondary-btn"
+                onClick={disconnect}
+              >
                 Disconnect
               </button>
+
             </div>
 
             <div className="result-box">
+
               <div>
                 <small>CONNECTION RESULT</small>
-                <h3 className={status === 'Established' ? 'success-text' : status === 'Failed' ? 'error-text' : ''}>
+
+                <h3
+                  className={
+                    status === 'Established'
+                      ? 'success-text'
+                      : status === 'Failed'
+                      ? 'error-text'
+                      : ''
+                  }
+                >
                   {status}
                 </h3>
               </div>
-              <span className={`result-indicator ${status === 'Established' ? 'success-bg' : status === 'Failed' ? 'error-bg' : ''}`}>
-                {status === 'Established' ? '✓' : status === 'Failed' ? '✕' : '●'}
+
+              <span
+                className={`result-indicator ${
+                  status === 'Established'
+                    ? 'success-bg'
+                    : status === 'Failed'
+                    ? 'error-bg'
+                    : ''
+                }`}
+              >
+                {status === 'Established'
+                  ? '✓'
+                  : status === 'Failed'
+                  ? '✕'
+                  : '●'}
               </span>
+
             </div>
+
           </div>
 
+          {/* FLAT DFA State Analysis */}
           <div className="panel dfa-panel">
+
             <div className="panel-heading">
+
               <div>
                 <h2>FLAT – DFA Analysis</h2>
-                <p>Finite automata state transition</p>
+                <p>TCP finite automata state transition diagram</p>
               </div>
+
               <span className="small-tag">FLAT</span>
+
             </div>
 
             {flatAnalysis ? (
               <>
-                <div className="dfa-flow">
-                  {flatAnalysis.transitions.map((state, index) => (
-                    <div className="dfa-step" key={`${state}-${index}`}>
-                      <div className={`dfa-node ${index === flatAnalysis.transitions.length - 1 ? 'final-node' : ''}`}>
-                        {state}
+
+                <h3 className="table-title">
+                  TCP State Transition Diagram
+                </h3>
+
+                <div
+                  className="dfa-flow"
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '15px 5px'
+                  }}
+                >
+
+                  {(flatAnalysis.transitions || []).map(
+                    (state, index, states) => (
+                      <div
+                        className="dfa-step"
+                        key={`${state}-${index}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px'
+                        }}
+                      >
+
+                        <div
+                          className={`dfa-node ${
+                            index === states.length - 1
+                              ? 'final-node'
+                              : ''
+                          }`}
+                          style={{
+                            padding: '14px',
+                            borderRadius: '12px',
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                            minWidth: '90px',
+                            border: '2px solid currentColor'
+                          }}
+                        >
+                          {state}
+                        </div>
+
+                        {index < states.length - 1 && (
+                          <span
+                            className="dfa-arrow"
+                            style={{
+                              fontSize: '24px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            →
+                          </span>
+                        )}
+
                       </div>
-                      {index < flatAnalysis.transitions.length - 1 && (
-                        <span className="dfa-arrow">→</span>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  )}
+
                 </div>
 
                 <div className="dfa-details">
-                  <p><strong>Initial State:</strong> {flatAnalysis.initialState}</p>
-                  <p><strong>Input:</strong> {flatAnalysis.input}</p>
-                  <p><strong>Final State:</strong> {flatAnalysis.finalState}</p>
-                  <p><strong>Result:</strong> {flatAnalysis.result}</p>
+
+                  <p>
+                    <strong>Initial State:</strong>{' '}
+                    {flatAnalysis.initialState}
+                  </p>
+
+                  <p>
+                    <strong>Input:</strong>{' '}
+                    {flatAnalysis.input}
+                  </p>
+
+                  <p>
+                    <strong>Final State:</strong>{' '}
+                    {flatAnalysis.finalState}
+                  </p>
+
+                  <p>
+                    <strong>Result:</strong>{' '}
+                    {flatAnalysis.result}
+                  </p>
+
                 </div>
 
-                <h3 className="table-title">Transition Table</h3>
+                <h3 className="table-title">
+                  State Transition Table
+                </h3>
+
                 <div className="table-scroll">
+
                   <table>
+
                     <thead>
                       <tr>
                         <th>Current State</th>
@@ -351,40 +589,63 @@ const [lastUpdated, setLastUpdated] = useState(null)
                         <th>Next State</th>
                       </tr>
                     </thead>
+
                     <tbody>
-                      {flatAnalysis.transitionTable?.map((item, index) => (
-                        <tr key={index}>
-                          <td>{item.currentState}</td>
-                          <td>{item.input}</td>
-                          <td>{item.nextState}</td>
-                        </tr>
-                      ))}
+
+                      {flatAnalysis.transitionTable?.map(
+                        (item, index) => (
+                          <tr key={index}>
+                            <td>{item.currentState}</td>
+                            <td>{item.input}</td>
+                            <td>{item.nextState}</td>
+                          </tr>
+                        )
+                      )}
+
                     </tbody>
+
                   </table>
+
                 </div>
+
               </>
             ) : (
+
               <div className="empty-state">
                 <div>⇄</div>
                 <p>Run a TCP test to view DFA state transitions.</p>
               </div>
+
             )}
+
           </div>
+
         </section>
 
+        {/* Connection History */}
         <section className="panel history-panel" id="history">
+
           <div className="panel-heading">
+
             <div>
               <h2>Connection History</h2>
               <p>Previously tested TCP connections saved in MongoDB</p>
             </div>
-            <button className="refresh-btn" onClick={fetchHistory}>
-              ↻ Refresh
+
+            <button
+              className="refresh-btn"
+              onClick={() => fetchHistory(true)}
+              disabled={refreshing}
+            >
+              {refreshing ? 'Refreshing...' : '↻ Refresh'}
             </button>
+
           </div>
 
           <div className="table-scroll">
+
             <table>
+
               <thead>
                 <tr>
                   <th>Hostname / IP</th>
@@ -394,67 +655,128 @@ const [lastUpdated, setLastUpdated] = useState(null)
                   <th>Date & Time</th>
                 </tr>
               </thead>
+
               <tbody>
+
                 {connectionHistory.length > 0 ? (
+
                   connectionHistory.map((item, index) => (
+
                     <tr key={item._id || index}>
+
                       <td>{item.host}</td>
                       <td>{item.port}</td>
+
                       <td>
-                        <span className={`status-badge ${item.status === 'Success' ? 'badge-success' : 'badge-failed'}`}>
+                        <span
+                          className={`status-badge ${
+                            item.status === 'Success'
+                              ? 'badge-success'
+                              : 'badge-failed'
+                          }`}
+                        >
                           {item.status}
                         </span>
                       </td>
+
                       <td>{item.message || '-'}</td>
                       <td>{item.time || '-'}</td>
+
                     </tr>
+
                   ))
+
                 ) : (
+
                   <tr>
                     <td colSpan="5" className="empty-table">
                       No connection history available.
                     </td>
                   </tr>
+
                 )}
+
               </tbody>
+
             </table>
+
           </div>
+
         </section>
 
+        {/* Logs and Reports */}
         <section className="bottom-grid" id="reports">
+
           <div className="panel logs-panel">
+
             <div className="panel-heading">
+
               <div>
                 <h2>Activity Logs</h2>
                 <p>Recent dashboard activities</p>
               </div>
-              <button className="clear-btn" onClick={clearLogs}>Clear</button>
+
+              <button
+                className="clear-btn"
+                onClick={clearLogs}
+              >
+                Clear
+              </button>
+
             </div>
-            {logs.length > 0 ? logs.slice(0, 6).map((log, index) => (
-              <div className="log-row" key={index}>
-                <span className="log-dot" />
-                <div>
-                  <p>{log.message}</p>
-                  <small>{log.time}</small>
+
+            {logs.length > 0 ? (
+
+              logs.slice(0, 6).map((log, index) => (
+
+                <div className="log-row" key={index}>
+
+                  <span className="log-dot" />
+
+                  <div>
+                    <p>{log.message}</p>
+                    <small>{log.time}</small>
+                  </div>
+
                 </div>
-              </div>
-            )) : <p className="muted">No recent activities.</p>}
+
+              ))
+
+            ) : (
+
+              <p className="muted">No recent activities.</p>
+
+            )}
+
           </div>
 
           <div className="panel report-panel">
+
             <div className="report-icon">PDF</div>
+
             <h2>Generate Report</h2>
-            <p>Download a PDF containing connection statistics and history.</p>
-            <button className="primary-btn" onClick={generateReport}>
+
+            <p>
+              Download a PDF containing connection statistics and history.
+            </p>
+
+            <button
+              className="primary-btn"
+              onClick={generateReport}
+            >
               ↓ Download PDF Report
             </button>
+
           </div>
+
         </section>
 
         <footer className="footer">
           TCP Failure Analysis System · Full Stack Web Development · Computer Networks · FLAT
         </footer>
+
       </main>
+
     </div>
   )
 }
