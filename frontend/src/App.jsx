@@ -236,6 +236,11 @@ function App() {
     })
   }
 
+  // Prepare transition states for the diagram
+  const transitionStates = Array.isArray(flatAnalysis?.transitions)
+    ? flatAnalysis.transitions
+    : []
+
   return (
     <div className="app">
 
@@ -491,64 +496,109 @@ function App() {
                   TCP State Transition Diagram
                 </h3>
 
-                <div
-                  className="dfa-flow"
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '15px 5px'
-                  }}
-                >
+                {transitionStates.length > 0 ? (
 
-                  {(flatAnalysis.transitions || []).map(
-                    (state, index, states) => (
-                      <div
-                        className="dfa-step"
-                        key={`${state}-${index}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px'
-                        }}
-                      >
+                  <div className="transition-diagram-wrapper">
 
-                        <div
-                          className={`dfa-node ${
-                            index === states.length - 1
-                              ? 'final-node'
-                              : ''
-                          }`}
-                          style={{
-                            padding: '14px',
-                            borderRadius: '12px',
-                            textAlign: 'center',
-                            fontWeight: 'bold',
-                            minWidth: '90px',
-                            border: '2px solid currentColor'
-                          }}
-                        >
-                          {state}
-                        </div>
+                    <div className="transition-diagram">
 
-                        {index < states.length - 1 && (
-                          <span
-                            className="dfa-arrow"
-                            style={{
-                              fontSize: '24px',
-                              fontWeight: 'bold'
-                            }}
+                      {transitionStates.map((state, index) => {
+
+                        const isStart = index === 0
+                        const isFinal = index === transitionStates.length - 1
+
+                        return (
+                          <div
+                            className="transition-step"
+                            key={`${state}-${index}`}
                           >
-                            →
-                          </span>
-                        )}
 
-                      </div>
-                    )
-                  )}
+                            <div className="state-card">
 
-                </div>
+                              <span
+                                className={`state-label ${
+                                  isStart
+                                    ? 'start-label'
+                                    : isFinal
+                                    ? 'final-label'
+                                    : 'middle-label'
+                                }`}
+                              >
+                                {isStart
+                                  ? 'START'
+                                  : isFinal
+                                  ? 'END'
+                                  : `STATE ${index + 1}`}
+                              </span>
+
+                              <div
+                                className={`state-node ${
+                                  isStart
+                                    ? 'start-node'
+                                    : isFinal
+                                    ? 'final-node'
+                                    : 'middle-node'
+                                }`}
+                              >
+                                <span className="state-number">
+                                  {index + 1}
+                                </span>
+
+                                <strong>{state}</strong>
+                              </div>
+
+                              <span className="state-description">
+                                {isStart
+                                  ? 'Initial State'
+                                  : isFinal
+                                  ? 'Final State'
+                                  : 'Intermediate State'}
+                              </span>
+
+                            </div>
+
+                            {!isFinal && (
+                              <div className="transition-connector">
+                                <span className="connector-line" />
+                                <span className="connector-arrow">➜</span>
+                              </div>
+                            )}
+
+                          </div>
+                        )
+                      })}
+
+                    </div>
+
+                    <div className="diagram-legend">
+
+                      <span>
+                        <i className="legend-dot start-legend" />
+                        Initial State
+                      </span>
+
+                      <span>
+                        <i className="legend-dot middle-legend" />
+                        Intermediate State
+                      </span>
+
+                      <span>
+                        <i className="legend-dot final-legend" />
+                        Final State
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                ) : (
+
+                  <div className="empty-state diagram-empty">
+                    <div>⇄</div>
+                    <p>No transition states available for this test.</p>
+                  </div>
+
+                )}
 
                 <div className="dfa-details">
 
@@ -592,14 +642,26 @@ function App() {
 
                     <tbody>
 
-                      {flatAnalysis.transitionTable?.map(
-                        (item, index) => (
-                          <tr key={index}>
-                            <td>{item.currentState}</td>
-                            <td>{item.input}</td>
-                            <td>{item.nextState}</td>
-                          </tr>
+                      {flatAnalysis.transitionTable?.length > 0 ? (
+
+                        flatAnalysis.transitionTable.map(
+                          (item, index) => (
+                            <tr key={index}>
+                              <td>{item.currentState}</td>
+                              <td>{item.input}</td>
+                              <td>{item.nextState}</td>
+                            </tr>
+                          )
                         )
+
+                      ) : (
+
+                        <tr>
+                          <td colSpan="3" className="empty-table">
+                            No transition table data available.
+                          </td>
+                        </tr>
+
                       )}
 
                     </tbody>
@@ -609,6 +671,7 @@ function App() {
                 </div>
 
               </>
+
             ) : (
 
               <div className="empty-state">
