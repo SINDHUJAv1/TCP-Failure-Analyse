@@ -18,8 +18,6 @@ function App() {
   const [mongoStatus, setMongoStatus] = useState('Checking')
   const [loading, setLoading] = useState(false)
   const [activePage, setActivePage] = useState('Dashboard')
-
-  // Refresh states
   const [refreshing, setRefreshing] = useState(false)
   const [refreshMessage, setRefreshMessage] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -35,7 +33,7 @@ function App() {
     ])
   }
 
-  // Fetch latest data from MongoDB
+  // Fetch latest connection history from MongoDB
   const fetchHistory = async (showFeedback = false) => {
     if (showFeedback) {
       setRefreshing(true)
@@ -57,13 +55,14 @@ function App() {
 
       setConnectionHistory(data)
       setMongoStatus('Connected')
-
       setAttempts(data.length)
+
       setSuccessCount(
-        data.filter(x => x.status === 'Success').length
+        data.filter(item => item.status === 'Success').length
       )
+
       setFailureCount(
-        data.filter(x => x.status !== 'Success').length
+        data.filter(item => item.status !== 'Success').length
       )
 
       setFlatAnalysis(
@@ -78,18 +77,14 @@ function App() {
         setRefreshMessage('Data refreshed successfully!')
         addLog('Dashboard data refreshed from MongoDB')
       }
-
     } catch (error) {
       setMongoStatus('Disconnected')
       console.error(error.message)
 
       if (showFeedback) {
-        setRefreshMessage(
-          'Refresh failed. Check backend connection.'
-        )
+        setRefreshMessage('Refresh failed. Check backend connection.')
         addLog(`Refresh failed: ${error.message}`)
       }
-
     } finally {
       if (showFeedback) {
         setRefreshing(false)
@@ -122,7 +117,7 @@ function App() {
 
     setLoading(true)
     setStatus('Connecting')
-    addLog(`Testing ${ip}:${portNumber}`)
+    addLog(`Testing ${ip.trim()}:${portNumber}`)
 
     try {
       const response = await fetch(`${API}/api/test-connection`, {
@@ -139,17 +134,10 @@ function App() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          data.message || 'Connection request failed'
-        )
+        throw new Error(data.message || 'Connection request failed')
       }
 
-      setStatus(
-        data.status === 'Success'
-          ? 'Established'
-          : 'Failed'
-      )
-
+      setStatus(data.status === 'Success' ? 'Established' : 'Failed')
       setFlatAnalysis(data.flatAnalysis || null)
 
       addLog(
@@ -157,11 +145,10 @@ function App() {
       )
 
       await fetchHistory()
-
     } catch (error) {
       setStatus('Failed')
+      setFlatAnalysis(null)
       addLog(`Error: ${error.message}`)
-
     } finally {
       setLoading(false)
     }
@@ -170,11 +157,6 @@ function App() {
   const disconnect = () => {
     setStatus('Terminated')
     addLog('Connection terminated by user')
-  }
-
-  const simulateFailure = () => {
-    setStatus('Failed')
-    addLog('Simulated failure: Connection timeout')
   }
 
   const clearLogs = () => {
@@ -231,25 +213,41 @@ function App() {
       page === 'History' ? 'history' : 'reports'
     )
 
-    element?.scrollIntoView({
-      behavior: 'smooth'
-    })
+    element?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Prepare transition states for the diagram
+  // Actual state sequence received from backend
   const transitionStates = Array.isArray(flatAnalysis?.transitions)
     ? flatAnalysis.transitions
     : []
+
+  const transitionTable = Array.isArray(flatAnalysis?.transitionTable)
+    ? flatAnalysis.transitionTable
+    : []
+
+  // Find the input responsible for each transition
+  const getTransitionInput = (currentState, nextState) => {
+    const transition = transitionTable.find(item =>
+      item.currentState === currentState &&
+      item.nextState === nextState
+    )
+
+    return transition?.input || 'Transition'
+  }
+
+  const getStateType = (state) => {
+    if (state === flatAnalysis?.initialState) return 'initial'
+    if (state === flatAnalysis?.finalState) return 'final'
+    return 'intermediate'
+  }
 
   return (
     <div className="app">
 
       {/* Sidebar */}
       <aside className="sidebar">
-
         <div className="brand">
           <div className="brand-icon">TCP</div>
-
           <div>
             <h2>TCP Monitor</h2>
             <span>Connection Analysis</span>
@@ -275,14 +273,12 @@ function App() {
         ))}
 
         <div className="sidebar-bottom">
-
           <div className="mongo-side">
             <span
               className={`dot ${
                 mongoStatus === 'Connected' ? 'green' : 'red'
               }`}
             />
-
             <div>
               <strong>MongoDB</strong>
               <small>{mongoStatus}</small>
@@ -291,14 +287,12 @@ function App() {
 
           <p>TCP Failure Analysis v1.0</p>
         </div>
-
       </aside>
 
       {/* Main Dashboard */}
       <main className="main-content" id="dashboard">
 
         <header className="topbar">
-
           <div>
             <h1>TCP Connection Failure Analysis</h1>
             <p>Monitor, test and analyze TCP connections</p>
@@ -308,12 +302,10 @@ function App() {
             <span className="dot green" />
             System Online
           </div>
-
         </header>
 
         {/* Dashboard Overview */}
         <section className="welcome-row">
-
           <div>
             <h2>Dashboard Overview</h2>
             <p>Real-time TCP connection monitoring dashboard</p>
@@ -328,32 +320,18 @@ function App() {
               {refreshing ? 'Refreshing...' : '↻ Refresh Data'}
             </button>
 
-            <small
-              style={{
-                display: 'block',
-                marginTop: '8px'
-              }}
-            >
-              {refreshMessage}
-            </small>
+            <small className="refresh-message">{refreshMessage}</small>
 
             {lastUpdated && (
-              <small
-                style={{
-                  display: 'block',
-                  marginTop: '4px'
-                }}
-              >
+              <small className="last-updated">
                 Last Updated: {lastUpdated.toLocaleTimeString()}
               </small>
             )}
           </div>
-
         </section>
 
         {/* Statistics */}
         <section className="stats-grid">
-
           <div className="stat-card blue">
             <div className="stat-icon">⌁</div>
             <p>Total Attempts</p>
@@ -381,7 +359,6 @@ function App() {
             <h2>{successRate}%</h2>
             <small>Based on saved history</small>
           </div>
-
         </section>
 
         {/* Simulator and FLAT Analysis */}
@@ -389,20 +366,15 @@ function App() {
 
           {/* Connection Simulator */}
           <div className="panel simulator-panel">
-
             <div className="panel-heading">
-
               <div>
                 <h2>Connection Simulator</h2>
                 <p>Test a TCP connection using hostname and port</p>
               </div>
-
               <span className="small-tag">TCP TEST</span>
-
             </div>
 
             <label>Hostname / IP Address</label>
-
             <input
               value={ip}
               onChange={e => setIp(e.target.value)}
@@ -410,7 +382,6 @@ function App() {
             />
 
             <label>Port Number</label>
-
             <input
               type="number"
               value={port}
@@ -419,7 +390,6 @@ function App() {
             />
 
             <div className="action-buttons">
-
               <button
                 className="primary-btn"
                 onClick={startConnection}
@@ -434,14 +404,11 @@ function App() {
               >
                 Disconnect
               </button>
-
             </div>
 
             <div className="result-box">
-
               <div>
                 <small>CONNECTION RESULT</small>
-
                 <h3
                   className={
                     status === 'Established'
@@ -470,158 +437,136 @@ function App() {
                   ? '✕'
                   : '●'}
               </span>
-
             </div>
-
           </div>
 
           {/* FLAT DFA State Analysis */}
           <div className="panel dfa-panel">
-
             <div className="panel-heading">
-
               <div>
                 <h2>FLAT – DFA Analysis</h2>
                 <p>TCP finite automata state transition diagram</p>
               </div>
-
               <span className="small-tag">FLAT</span>
-
             </div>
 
             {flatAnalysis ? (
               <>
-
                 <h3 className="table-title">
                   TCP State Transition Diagram
                 </h3>
 
                 {transitionStates.length > 0 ? (
-
                   <div className="transition-diagram-wrapper">
 
+                    <div className="diagram-result-heading">
+                      <span className={
+                        flatAnalysis.result === 'Success'
+                          ? 'diagram-success'
+                          : 'diagram-failure'
+                      }>
+                        {flatAnalysis.result === 'Success'
+                          ? '✓ Connection Successful'
+                          : '✕ Connection Failed'}
+                      </span>
+                    </div>
+
                     <div className="transition-diagram">
-
                       {transitionStates.map((state, index) => {
-
-                        const isStart = index === 0
-                        const isFinal = index === transitionStates.length - 1
+                        const stateType = getStateType(state)
+                        const nextState = transitionStates[index + 1]
+                        const transitionInput = nextState
+                          ? getTransitionInput(state, nextState)
+                          : ''
 
                         return (
                           <div
                             className="transition-step"
                             key={`${state}-${index}`}
                           >
-
                             <div className="state-card">
-
-                              <span
-                                className={`state-label ${
-                                  isStart
-                                    ? 'start-label'
-                                    : isFinal
-                                    ? 'final-label'
-                                    : 'middle-label'
-                                }`}
-                              >
-                                {isStart
+                              <span className={`state-label ${stateType}-label`}>
+                                {stateType === 'initial'
                                   ? 'START'
-                                  : isFinal
-                                  ? 'END'
+                                  : stateType === 'final'
+                                  ? 'FINAL STATE'
                                   : `STATE ${index + 1}`}
                               </span>
 
-                              <div
-                                className={`state-node ${
-                                  isStart
-                                    ? 'start-node'
-                                    : isFinal
-                                    ? 'final-node'
-                                    : 'middle-node'
-                                }`}
-                              >
+                              <div className={`state-node ${stateType}-node`}>
                                 <span className="state-number">
                                   {index + 1}
                                 </span>
-
                                 <strong>{state}</strong>
+                                {stateType === 'final' && (
+                                  <span className="state-check">
+                                    {state === 'ESTABLISHED' ? '✓' : '✕'}
+                                  </span>
+                                )}
                               </div>
 
                               <span className="state-description">
-                                {isStart
+                                {stateType === 'initial'
                                   ? 'Initial State'
-                                  : isFinal
+                                  : stateType === 'final'
                                   ? 'Final State'
                                   : 'Intermediate State'}
                               </span>
-
                             </div>
 
-                            {!isFinal && (
+                            {nextState && (
                               <div className="transition-connector">
+                                <span className="transition-input">
+                                  {transitionInput}
+                                </span>
                                 <span className="connector-line" />
                                 <span className="connector-arrow">➜</span>
                               </div>
                             )}
-
                           </div>
                         )
                       })}
-
                     </div>
 
                     <div className="diagram-legend">
-
                       <span>
-                        <i className="legend-dot start-legend" />
+                        <i className="legend-dot initial-legend" />
                         Initial State
                       </span>
-
                       <span>
-                        <i className="legend-dot middle-legend" />
+                        <i className="legend-dot intermediate-legend" />
                         Intermediate State
                       </span>
-
                       <span>
                         <i className="legend-dot final-legend" />
                         Final State
                       </span>
-
                     </div>
-
                   </div>
-
                 ) : (
-
                   <div className="empty-state diagram-empty">
                     <div>⇄</div>
                     <p>No transition states available for this test.</p>
                   </div>
-
                 )}
 
                 <div className="dfa-details">
-
                   <p>
                     <strong>Initial State:</strong>{' '}
-                    {flatAnalysis.initialState}
+                    {flatAnalysis.initialState || '-'}
                   </p>
-
                   <p>
                     <strong>Input:</strong>{' '}
-                    {flatAnalysis.input}
+                    {flatAnalysis.input || '-'}
                   </p>
-
                   <p>
                     <strong>Final State:</strong>{' '}
-                    {flatAnalysis.finalState}
+                    {flatAnalysis.finalState || '-'}
                   </p>
-
                   <p>
                     <strong>Result:</strong>{' '}
-                    {flatAnalysis.result}
+                    {flatAnalysis.result || '-'}
                   </p>
-
                 </div>
 
                 <h3 className="table-title">
@@ -629,9 +574,7 @@ function App() {
                 </h3>
 
                 <div className="table-scroll">
-
                   <table>
-
                     <thead>
                       <tr>
                         <th>Current State</th>
@@ -641,55 +584,37 @@ function App() {
                     </thead>
 
                     <tbody>
-
-                      {flatAnalysis.transitionTable?.length > 0 ? (
-
-                        flatAnalysis.transitionTable.map(
-                          (item, index) => (
-                            <tr key={index}>
-                              <td>{item.currentState}</td>
-                              <td>{item.input}</td>
-                              <td>{item.nextState}</td>
-                            </tr>
-                          )
-                        )
-
+                      {transitionTable.length > 0 ? (
+                        transitionTable.map((item, index) => (
+                          <tr key={index}>
+                            <td>{item.currentState}</td>
+                            <td>{item.input}</td>
+                            <td>{item.nextState}</td>
+                          </tr>
+                        ))
                       ) : (
-
                         <tr>
                           <td colSpan="3" className="empty-table">
                             No transition table data available.
                           </td>
                         </tr>
-
                       )}
-
                     </tbody>
-
                   </table>
-
                 </div>
-
               </>
-
             ) : (
-
               <div className="empty-state">
                 <div>⇄</div>
                 <p>Run a TCP test to view DFA state transitions.</p>
               </div>
-
             )}
-
           </div>
-
         </section>
 
         {/* Connection History */}
         <section className="panel history-panel" id="history">
-
           <div className="panel-heading">
-
             <div>
               <h2>Connection History</h2>
               <p>Previously tested TCP connections saved in MongoDB</p>
@@ -702,13 +627,10 @@ function App() {
             >
               {refreshing ? 'Refreshing...' : '↻ Refresh'}
             </button>
-
           </div>
 
           <div className="table-scroll">
-
             <table>
-
               <thead>
                 <tr>
                   <th>Hostname / IP</th>
@@ -720,16 +642,11 @@ function App() {
               </thead>
 
               <tbody>
-
                 {connectionHistory.length > 0 ? (
-
                   connectionHistory.map((item, index) => (
-
                     <tr key={item._id || index}>
-
                       <td>{item.host}</td>
                       <td>{item.port}</td>
-
                       <td>
                         <span
                           className={`status-badge ${
@@ -741,105 +658,69 @@ function App() {
                           {item.status}
                         </span>
                       </td>
-
                       <td>{item.message || '-'}</td>
                       <td>{item.time || '-'}</td>
-
                     </tr>
-
                   ))
-
                 ) : (
-
                   <tr>
                     <td colSpan="5" className="empty-table">
                       No connection history available.
                     </td>
                   </tr>
-
                 )}
-
               </tbody>
-
             </table>
-
           </div>
-
         </section>
 
         {/* Logs and Reports */}
         <section className="bottom-grid" id="reports">
-
           <div className="panel logs-panel">
-
             <div className="panel-heading">
-
               <div>
                 <h2>Activity Logs</h2>
                 <p>Recent dashboard activities</p>
               </div>
 
-              <button
-                className="clear-btn"
-                onClick={clearLogs}
-              >
+              <button className="clear-btn" onClick={clearLogs}>
                 Clear
               </button>
-
             </div>
 
             {logs.length > 0 ? (
-
               logs.slice(0, 6).map((log, index) => (
-
                 <div className="log-row" key={index}>
-
                   <span className="log-dot" />
-
                   <div>
                     <p>{log.message}</p>
                     <small>{log.time}</small>
                   </div>
-
                 </div>
-
               ))
-
             ) : (
-
               <p className="muted">No recent activities.</p>
-
             )}
-
           </div>
 
           <div className="panel report-panel">
-
             <div className="report-icon">PDF</div>
-
             <h2>Generate Report</h2>
-
             <p>
               Download a PDF containing connection statistics and history.
             </p>
 
-            <button
-              className="primary-btn"
-              onClick={generateReport}
-            >
+            <button className="primary-btn" onClick={generateReport}>
               ↓ Download PDF Report
             </button>
-
           </div>
-
         </section>
 
         <footer className="footer">
-          TCP Failure Analysis System · Full Stack Web Development · Computer Networks · FLAT
+          TCP Failure Analysis System · Full Stack Web Development ·
+          Computer Networks · FLAT
         </footer>
-
       </main>
-
     </div>
   )
 }
